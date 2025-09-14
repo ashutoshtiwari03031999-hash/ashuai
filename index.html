@@ -1,0 +1,484 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>ASHU_AI</title>
+  <link rel="stylesheet" href="styles.css" />
+  <style>
+    html,body{height:100%;margin:0}
+    body{background:linear-gradient(135deg,#0f2027 0%,#2c5364 100%);color:#e6eef8;font-family:Inter,system-ui,Arial}
+    .app{display:flex;flex-direction:column;height:100vh;box-sizing:border-box}
+    .logo-row{
+      display:flex;
+      flex-direction:column;
+      align-items:center;
+      gap:24px;
+      margin-bottom:24px;
+      margin-top:32px;
+    }
+    .logo-img{
+      width:180px;
+      height:180px;
+      object-fit:cover;
+      border-radius:50%;
+      border:6px solid #0ea5ff;
+      background:#fff;
+      box-shadow:0 4px 32px #0ea5ff44;
+      display:block;
+    }
+    .main-content{
+      flex:1;
+      display:flex;
+      flex-direction:column;
+      align-items:center;
+      justify-content:center;
+      gap:18px;
+    }
+    .user-name{
+      font-weight:900;
+      font-size:32px;
+      letter-spacing:2px;
+      background:linear-gradient(90deg,#0ea5ff,#ff004f);
+      -webkit-background-clip:text;background-clip:text;color:transparent;
+      margin-bottom:6px;
+      text-align:center;
+      text-shadow:0 2px 16px #0ea5ff44;
+    }
+    .rect-box{
+      width:100%;
+      max-width:480px;
+      min-height:70px;
+      border-radius:18px;
+      background:rgba(255,255,255,0.10);
+      border:2px solid #0ea5ff;
+      color:#e6eef8;
+      padding:24px;
+      box-sizing:border-box;
+      white-space:pre-wrap;
+      word-break:break-word;
+      display:flex;align-items:center;justify-content:center;text-align:center;
+      font-size:22px;
+      font-weight:500;
+      margin-bottom:12px;
+      box-shadow:0 4px 24px #0ea5ff22;
+      backdrop-filter:blur(2px);
+      transition:box-shadow .2s;
+    }
+    .mic-row{
+      display:flex;
+      flex-direction:column;
+      align-items:center;
+      justify-content:center;
+      gap:0;
+      position:relative;
+      height:144px; /* reserve space for gif/mic */
+    }
+    .mic{
+      width:70px;height:70px;border-radius:999px;border:none;cursor:pointer;
+      display:inline-flex;align-items:center;justify-content:center;
+      font-size:34px;background:linear-gradient(180deg,#0ea5ff,#ff004f);color:#00121a;
+      box-shadow:0 2px 16px #0ea5ff44;
+      transition:box-shadow .2s,transform .2s;
+      margin-bottom:10px;
+      z-index:2;
+    }
+    .mic:active{box-shadow:0 2px 24px #ff004f66;transform:scale(1.08);}
+    .circular-gif{
+      width:144px; /* double previous 72px */
+      height:144px;
+      border-radius:50%;
+      object-fit:cover;
+      border:6px solid #ff004f;
+      box-shadow:0 4px 32px #ff004f44;
+      display:none; /* hidden by default */
+      margin-top:0;
+      position:absolute;
+      top:0; left:50%; transform:translateX(-50%);
+      z-index:3;
+      background:#fff;
+    }
+    @media (max-width:700px){
+      .logo-img{width:112px;height:112px}
+      .circular-gif{width:84px;height:84px}
+      .user-name{font-size:20px}
+      .rect-box{padding:12px;font-size:14px}
+      .mic{width:44px;height:44px;font-size:20px}
+      .mic-row{height:84px;}
+    }
+  </style>
+</head>
+<body>
+  <main class="app">
+    <div class="logo-row">
+      <!-- Logo image from logo.jpg in your folder -->
+      <img src="logo.jpg" alt="ASHU_AI logo" class="logo-img"/>
+    </div>
+    <section class="main-content">
+      <div class="user-name">ASHU-AI</div>
+      <div id="liveText" class="rect-box">Tap the mic and speak. Your speech will appear here.</div>
+      <div class="mic-row">
+        <button id="micBtn" class="mic" title="Start voice command">🎙️</button>
+        <!-- Circular GIF from gifbb.gif in your folder -->
+        <img src="gifbb.gif" alt="Loading..." class="circular-gif" id="loadingGif"/>
+      </div>
+    </section>
+  </main>
+  <script src="config.js"></script>
+  <script>
+    // Simple speech recognition logic for live text box
+    let recognition;
+    const micBtn = document.getElementById('micBtn');
+    const liveText = document.getElementById('liveText');
+    const loadingGif = document.getElementById('loadingGif');
+
+    if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
+      const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+      recognition = new SR();
+      recognition.lang = 'en-US';
+      recognition.interimResults = true;
+      recognition.maxAlternatives = 1;
+    }
+
+    function showLoading(show){
+      if(loadingGif) loadingGif.style.display = show ? 'block' : 'none';
+      if(micBtn) micBtn.style.display = show ? 'none' : 'inline-flex';
+    }
+
+    function startListening(){
+      if (!recognition){ liveText.textContent = 'Voice not supported in this browser.'; return; }
+      liveText.textContent = 'Listening...';
+      showLoading(true);
+      recognition.start();
+    }
+
+    if (recognition){
+      recognition.onstart = () => { liveText.textContent = 'Listening...'; showLoading(true); };
+      recognition.onresult = (e) => {
+        let interim = '';
+        let final = '';
+        for (let i=0;i<e.results.length;i++){
+          const r = e.results[i];
+          if (r.isFinal) final += r[0].transcript;
+          else interim += r[0].transcript;
+        }
+        if (interim && !final) liveText.textContent = interim;
+        if (final){
+          liveText.textContent = final.trim();
+        }
+      };
+      recognition.onerror = (e)=>{ liveText.textContent = 'Error: ' + (e.error || 'unknown'); showLoading(false); };
+      recognition.onend = ()=>{ showLoading(false); if (!liveText.textContent) liveText.textContent = 'Tap the mic and speak.'; };
+    }
+
+    micBtn.addEventListener('click', ()=> {
+      startListening();
+    });
+
+    // Hide loading gif initially
+    showLoading(false);
+  </script>
+  <script>
+  // Time-based greeting when user enters the website
+  window.addEventListener('DOMContentLoaded', function() {
+    const liveText = document.getElementById('liveText');
+    let hour = new Date().getHours();
+    let greeting = "Welcome!";
+    if (hour >= 5 && hour < 12) greeting = "Good morning, Ashu!";
+    else if (hour >= 12 && hour < 17) greeting = "Good afternoon, Ashu!";
+    else if (hour >= 17 && hour < 22) greeting = "Good evening, Ashu!";
+    else greeting = "Hello, Ashu!";
+    liveText.textContent = `${greeting} I am your virtual assistant, created by ASHUTOSH BHOSDA.`;
+  });
+
+  // Enhanced command handler: opens apps, searches, and falls back to Google/Wikipedia with voice reply
+  function handleCommand(text) {
+    text = text.toLowerCase();
+    // Who created you?
+    if (
+      text.includes("who created you") ||
+      text.includes("who is your creator") ||
+      text.includes("who made you") ||
+      text.includes("who developed you")
+    ) {
+      liveText.textContent = "Created by Ashutosh.";
+      speak("Created by Ashutosh.");
+      return;
+    }
+    // What is your name?
+    if (
+      text.includes("what is your name") ||
+      text.includes("your name") ||
+      text.includes("who are you") ||
+      text.includes("naam kya hai") ||
+      text.includes("tumhara naam")
+    ) {
+      liveText.textContent = "My name is ASHU.";
+      speak("My name is ASHU.");
+      return;
+    }
+    // Date of birth or age
+    if (
+      text.includes("date of birth") ||
+      text.includes("your age") ||
+      text.includes("how old are you") ||
+      text.includes("when were you created")
+    ) {
+      let dateStr = creationDate.toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' });
+      let ageStr = getAgeString();
+      let msg = `I don't have an age like humans. I was created on ${dateStr}. I have been alive for ${ageStr}.`;
+      liveText.textContent = msg;
+      speak(msg);
+      return;
+    }
+    // Open YouTube
+    if (text.includes("open youtube")) {
+      window.open("https://www.youtube.com", "_blank");
+      liveText.textContent = "Opening YouTube...";
+      speak("Opening YouTube.");
+      return;
+    }
+    // Open Instagram
+    if (text.includes("open instagram")) {
+      window.open("https://www.instagram.com", "_blank");
+      liveText.textContent = "Opening Instagram...";
+      speak("Opening Instagram.");
+      return;
+    }
+    // Open Google
+    if (text.includes("open google")) {
+      window.open("https://www.google.com", "_blank");
+      liveText.textContent = "Opening Google...";
+      speak("Opening Google.");
+      return;
+    }
+    // Open Wikipedia
+    if (text.includes("open wikipedia")) {
+      let query = text.replace("open wikipedia", "").trim();
+      if (query) {
+        window.open("https://en.wikipedia.org/wiki/" + encodeURIComponent(query), "_blank");
+        liveText.textContent = `Opening Wikipedia for ${query}.`;
+        speak(`Opening Wikipedia for ${query}.`);
+      } else {
+        window.open("https://en.wikipedia.org", "_blank");
+        liveText.textContent = "Opening Wikipedia...";
+        speak("Opening Wikipedia.");
+      }
+      return;
+    }
+    // Search Wikipedia
+    if (text.includes("search wikipedia")) {
+      let query = text.replace("search wikipedia", "").trim();
+      if (query) {
+        window.open("https://en.wikipedia.org/wiki/" + encodeURIComponent(query), "_blank");
+        liveText.textContent = `Searching Wikipedia for ${query}.`;
+        speak(`Searching Wikipedia for ${query}.`);
+      } else {
+        liveText.textContent = "Please say what to search on Wikipedia.";
+        speak("Please say what to search on Wikipedia.");
+      }
+      return;
+    }
+    // Search Google
+    if (text.includes("search google")) {
+      let query = text.replace("search google", "").trim();
+      window.open("https://www.google.com/search?q=" + encodeURIComponent(query), "_blank");
+      liveText.textContent = `Searching Google for ${query}.`;
+      speak(`Searching Google for ${query}.`);
+      return;
+    }
+    // For any other question: search Google and reply
+    liveText.textContent = `Searching it for you on Google...`;
+    speak("Searching it for you on Google.");
+    window.open("https://www.google.com/search?q=" + encodeURIComponent(text), "_blank");
+  }
+
+  // Integrate with speech recognition and voice reply
+  if (recognition) {
+    recognition.onresult = (e) => {
+      let interim = '';
+      let final = '';
+      for (let i=0;i<e.results.length;i++){
+        const r = e.results[i];
+        if (r.isFinal) final += r[0].transcript;
+        else interim += r[0].transcript;
+      }
+      if (interim && !final) liveText.textContent = interim;
+      if (final){
+        liveText.textContent = final.trim();
+        handleCommand(final.trim());
+      }
+    };
+  }
+</script>
+<script>
+  // Set the assistant's creation date
+  const creationDate = new Date("2025-09-14");
+
+  function speak(text) {
+    const synth = window.speechSynthesis;
+    let voices = synth.getVoices();
+
+    // Detect Hindi language in text (simple check)
+    const isHindi = /[\u0900-\u097F]/.test(text) || text.toLowerCase().includes("हिन्दी") || text.toLowerCase().includes("hindi");
+
+    // Prefer female voices for Hindi or English
+    let voice;
+    if (isHindi) {
+      voice = voices.find(v => v.lang.startsWith('hi') && v.name.toLowerCase().includes('female')) ||
+              voices.find(v => v.lang.startsWith('hi') && v.name.toLowerCase().includes('woman')) ||
+              voices.find(v => v.lang.startsWith('hi')) ||
+              voices.find(v => v.lang.startsWith('en') && v.name.toLowerCase().includes('female')) ||
+              voices.find(v => v.lang.startsWith('en'));
+    } else {
+      voice = voices.find(v => v.lang.startsWith('en') && v.name.toLowerCase().includes('female')) ||
+              voices.find(v => v.lang.startsWith('en') && v.name.toLowerCase().includes('woman')) ||
+              voices.find(v => v.lang.startsWith('en') && v.gender === 'female') ||
+              voices.find(v => v.lang.startsWith('en') && v.name.toLowerCase().includes('google')) ||
+              voices.find(v => v.lang.startsWith('en'));
+    }
+
+    let utter = new SpeechSynthesisUtterance(text);
+    if (voice) utter.voice = voice;
+    utter.rate = 1;
+    utter.pitch = 1.18; // soft, slightly higher pitch
+    utter.volume = 1;   // loud
+    utter.lang = isHindi ? 'hi-IN' : 'en-US';
+    synth.cancel();
+    synth.speak(utter);
+  }
+
+  function getAgeString() {
+    const now = new Date();
+    let diff = now - creationDate;
+    let days = Math.floor(diff / (1000 * 60 * 60 * 24));
+    let hours = Math.floor((diff / (1000 * 60 * 60)) % 24);
+    let minutes = Math.floor((diff / (1000 * 60)) % 60);
+    let ageStr = "";
+    if (days > 0) ageStr += `${days} day${days > 1 ? "s" : ""}, `;
+    if (hours > 0) ageStr += `${hours} hour${hours > 1 ? "s" : ""}, `;
+    ageStr += `${minutes} minute${minutes !== 1 ? "s" : ""}`;
+    return ageStr;
+  }
+
+  function handleCommand(text) {
+    text = text.toLowerCase();
+    // Who created you?
+    if (
+      text.includes("who created you") ||
+      text.includes("who is your creator") ||
+      text.includes("who made you") ||
+      text.includes("who developed you")
+    ) {
+      liveText.textContent = "Created by Ashutosh.";
+      speak("Created by Ashutosh.");
+      return;
+    }
+    // What is your name?
+    if (
+      text.includes("what is your name") ||
+      text.includes("your name") ||
+      text.includes("who are you") ||
+      text.includes("naam kya hai") ||
+      text.includes("tumhara naam")
+    ) {
+      liveText.textContent = "My name is ASHU.";
+      speak("My name is ASHU.");
+      return;
+    }
+    // Date of birth or age
+    if (
+      text.includes("date of birth") ||
+      text.includes("your age") ||
+      text.includes("how old are you") ||
+      text.includes("when were you created")
+    ) {
+      let dateStr = creationDate.toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' });
+      let ageStr = getAgeString();
+      let msg = `I don't have an age like humans. I was created on ${dateStr}. I have been alive for ${ageStr}.`;
+      liveText.textContent = msg;
+      speak(msg);
+      return;
+    }
+    // Open YouTube
+    if (text.includes("open youtube")) {
+      window.open("https://www.youtube.com", "_blank");
+      liveText.textContent = "Opening YouTube...";
+      speak("Opening YouTube.");
+      return;
+    }
+    // Open Instagram
+    if (text.includes("open instagram")) {
+      window.open("https://www.instagram.com", "_blank");
+      liveText.textContent = "Opening Instagram...";
+      speak("Opening Instagram.");
+      return;
+    }
+    // Open Google
+    if (text.includes("open google")) {
+      window.open("https://www.google.com", "_blank");
+      liveText.textContent = "Opening Google...";
+      speak("Opening Google.");
+      return;
+    }
+    // Open Wikipedia
+    if (text.includes("open wikipedia")) {
+      let query = text.replace("open wikipedia", "").trim();
+      if (query) {
+        window.open("https://en.wikipedia.org/wiki/" + encodeURIComponent(query), "_blank");
+        liveText.textContent = `Opening Wikipedia for ${query}.`;
+        speak(`Opening Wikipedia for ${query}.`);
+      } else {
+        window.open("https://en.wikipedia.org", "_blank");
+        liveText.textContent = "Opening Wikipedia...";
+        speak("Opening Wikipedia.");
+      }
+      return;
+    }
+    // Search Wikipedia
+    if (text.includes("search wikipedia")) {
+      let query = text.replace("search wikipedia", "").trim();
+      if (query) {
+        window.open("https://en.wikipedia.org/wiki/" + encodeURIComponent(query), "_blank");
+        liveText.textContent = `Searching Wikipedia for ${query}.`;
+        speak(`Searching Wikipedia for ${query}.`);
+      } else {
+        liveText.textContent = "Please say what to search on Wikipedia.";
+        speak("Please say what to search on Wikipedia.");
+      }
+      return;
+    }
+    // Search Google
+    if (text.includes("search google")) {
+      let query = text.replace("search google", "").trim();
+      window.open("https://www.google.com/search?q=" + encodeURIComponent(query), "_blank");
+      liveText.textContent = `Searching Google for ${query}.`;
+      speak(`Searching Google for ${query}.`);
+      return;
+    }
+    // For any other question: search Google and reply
+    liveText.textContent = `Searching it for you on Google...`;
+    speak("Searching it for you on Google.");
+    window.open("https://www.google.com/search?q=" + encodeURIComponent(text), "_blank");
+  }
+
+  // Integrate with speech recognition and voice reply
+  if (recognition) {
+    recognition.onresult = (e) => {
+      let interim = '';
+      let final = '';
+      for (let i=0;i<e.results.length;i++){
+        const r = e.results[i];
+        if (r.isFinal) final += r[0].transcript;
+        else interim += r[0].transcript;
+      }
+      if (interim && !final) liveText.textContent = interim;
+      if (final){
+        liveText.textContent = final.trim();
+        handleCommand(final.trim());
+      }
+    };
+  }
+</script>
+</body>
+</html>
